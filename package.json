@@ -1,8 +1,25 @@
 {
   "name": "kiskord",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Privacy-focused P2P voice chat with Discord-quality audio processing",
+  "homepage": "https://kiskord.netlify.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lafun-code/kiskord.git"
+  },
+  "keywords": [
+    "webrtc",
+    "voice-chat",
+    "p2p",
+    "react",
+    "typescript",
+    "rnnoise",
+    "audio-processing"
+  ],
+  "author": "Kiskord Team",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
