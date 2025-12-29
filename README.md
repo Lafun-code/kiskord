@@ -6,7 +6,6 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 [![WebRTC](https://img.shields.io/badge/WebRTC-P2P-green.svg)](https://webrtc.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Netlify Status](https://api.netlify.com/api/v1/badges/YOUR_SITE_ID/deploy-status)](https://app.netlify.com/sites/kiskord/deploys)
 
 **Kiskord** is a modern, browser-based voice chat application that enables crystal-clear P2P audio communication without requiring account registration. Built with cutting-edge web technologies, it offers Discord-quality audio processing directly in your browser.
 
