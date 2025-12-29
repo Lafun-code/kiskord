@@ -19,21 +19,21 @@ export function Room() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
-  // CLEAN MODE: Browser'ın native noise suppression'ı Discord ile aynı teknoloji (RNNoise tabanlı)
-  // Custom processing eklemek sadece sorun çıkarır, browser zaten profesyonel seviyede işliyor
+  // STABLE MODE: Browser's native processing is professional-grade (same as Discord)
+  // Custom processing causes audio cuts - keep it simple!
   const [audioOptions, setAudioOptions] = useState<AudioProcessingOptions>({
-      audioQuality: "basic",      // Clean mode - sadece browser processing
-      useRNNoise: false,          // KAPALI - Browser zaten RNNoise kullanıyor
-      noiseSuppression: true,     // ✅ Chrome'un yerleşik gürültü kesme (profesyonel seviye)
-      echoCancellation: true,     // ✅ Yankı önleme
-      autoGainControl: true,      // ✅ Otomatik ses seviyesi
+      audioQuality: "basic",      // Most stable - no audio cuts
+      useRNNoise: false,          // OFF - Browser NS is already RNNoise-based
+      noiseSuppression: true,     // ✅ Chrome's built-in (professional level)
+      echoCancellation: true,     // ✅ Echo cancellation
+      autoGainControl: true,      // ✅ Auto gain control
       suppressionLevel: "high",
-      vadEnabled: false,
+      vadEnabled: false,          // ❌ MUST BE OFF - causes audio cuts!
       vadThreshold: 40,
       vadGracePeriod: 300,
-      highPassFilter: false,      // KAPALI - Browser zaten yapıyor
+      highPassFilter: false,      // OFF - Browser handles this
       highPassCutoff: 100,
-      useNoiseGate: false,
+      useNoiseGate: false,        // ❌ OFF - causes audio cuts!
       noiseGateThreshold: -50,
       useVoiceEQ: false,
       useDeEsser: false,

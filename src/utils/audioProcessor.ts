@@ -62,59 +62,61 @@ export const getAudioConstraints = (options: AudioProcessingOptions): MediaTrack
 };
 
 // Audio Quality Presets
+// IMPORTANT: Basic mode = most stable, no audio cuts
 export const AUDIO_QUALITY_PRESETS = {
   basic: {
     audioQuality: "basic" as const,
-    useRNNoise: false,
-    useNoiseGate: false,
+    useRNNoise: false,       // Browser NS is already professional
+    useNoiseGate: false,     // No noise gate = no audio cuts
     useVoiceEQ: false,
     useDeEsser: false,
     useLimiter: false,
-    vadEnabled: false,
-    highPassFilter: true,
+    vadEnabled: false,       // CRITICAL: VAD causes audio cuts!
+    highPassFilter: false,   // Let browser handle everything
     outputGain: 1.0,
   },
   balanced: {
     audioQuality: "balanced" as const,
-    useRNNoise: true,
-    useNoiseGate: true,
+    useRNNoise: false,       // Browser NS instead
+    useNoiseGate: false,     // Disable to prevent cuts
     noiseGateThreshold: -50,
-    useVoiceEQ: true,
+    useVoiceEQ: false,
     useDeEsser: false,
-    useLimiter: true,
-    vadEnabled: true,
+    useLimiter: false,
+    vadEnabled: false,       // VAD disabled
     vadThreshold: 40,
     highPassFilter: true,
-    outputGain: 1.2,
+    highPassCutoff: 80,
+    outputGain: 1.0,
   },
   professional: {
     audioQuality: "professional" as const,
-    useRNNoise: true,
-    useNoiseGate: true,
+    useRNNoise: true,        // RNNoise for max quality
+    useNoiseGate: false,     // No noise gate
     noiseGateThreshold: -55,
     useVoiceEQ: true,
-    useDeEsser: true,
+    useDeEsser: false,
     useLimiter: true,
-    vadEnabled: true,
+    vadEnabled: false,       // VAD disabled
     vadThreshold: 50,
     highPassFilter: true,
     highPassCutoff: 100,
-    outputGain: 1.2,
+    outputGain: 1.1,
   },
   ultra: {
     audioQuality: "ultra" as const,
     useRNNoise: true,
-    useNoiseGate: true,
-    noiseGateThreshold: -70,     // Extreme aggressive gate (nefes/klavye/alkış)
+    useNoiseGate: false,     // Disabled - was causing cuts
+    noiseGateThreshold: -70,
     useVoiceEQ: true,
     useDeEsser: true,
     useLimiter: true,
-    vadEnabled: true,
-    vadThreshold: 80,            // Maximum threshold - sadece güçlü ses
-    vadGracePeriod: 150,         // Çok kısa grace period
+    vadEnabled: false,       // VAD disabled
+    vadThreshold: 80,
+    vadGracePeriod: 150,
     highPassFilter: true,
-    highPassCutoff: 150,         // Çok yüksek cutoff (nefes seslerini kes)
-    outputGain: 1.4,             // Daha yüksek gain
+    highPassCutoff: 120,
+    outputGain: 1.2,
   }
 };
 

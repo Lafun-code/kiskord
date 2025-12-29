@@ -76,13 +76,13 @@ export function useWebRTC(
       noiseSuppression: true,
       echoCancellation: true,
       autoGainControl: true,
-      suppressionLevel: "medium",
-      useRNNoise: false,
-      vadEnabled: true,          // Voice Activity Detection aktif
-      vadThreshold: 40,          // Daha yüksek hassasiyet (daha az gürültü)
-      vadGracePeriod: 300,       // 300ms grace period
-      highPassFilter: true,      // Fan/AC gürültüsü filtrele
-      highPassCutoff: 80         // 80Hz altını kes
+      suppressionLevel: "high",
+      useRNNoise: false,          // Browser NS is already professional
+      vadEnabled: false,          // DISABLED - causes audio cuts!
+      vadThreshold: 40,
+      vadGracePeriod: 300,
+      highPassFilter: false,      // Let browser handle
+      highPassCutoff: 80
   },
   selectedDeviceId?: string // Optional microphone device ID
 ) {
@@ -390,8 +390,9 @@ export function useWebRTC(
             log("Simple audio chain setup complete");
           }
 
-          // Setup Voice Activity Detection
-          if (currentAudioOptionsRef.current.vadEnabled !== false) {
+          // VAD is now disabled by default to prevent audio cuts
+          // Only enable if explicitly set to true
+          if (currentAudioOptionsRef.current.vadEnabled === true) {
             const vad = new VoiceActivityDetector(
               stream,
               audioContext,
@@ -401,15 +402,14 @@ export function useWebRTC(
             vadRef.current = vad;
             log(`VAD enabled: threshold=${vad['threshold']}`);
             
-            // VAD artık sadece gösterge için kullanılıyor, audio track'i disable etmiyor
-            // Bu sayede ses kesintisi olmuyor
+            // VAD only for visual indicator, not audio control
             vadIntervalRef.current = setInterval(() => {
               if (vadRef.current) {
-                // Sadece speaking state'i güncellemek için kullan
-                // Track'i disable etme - Noise Gate bunu daha iyi yapıyor
                 vadRef.current.isSpeaking();
               }
-            }, 100); // 100ms interval (daha az CPU kullanımı)
+            }, 100);
+          } else {
+            log("VAD disabled - audio will flow continuously without cuts");
           }
 
           // Use the processed stream for transmission
