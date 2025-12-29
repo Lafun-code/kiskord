@@ -62,8 +62,11 @@ const getAudioLevel = (analyser: AnalyserNode): number => {
     }
     const rms = Math.sqrt(sum / bufferLength);
     
-    // Convert to 0-100 scale with better sensitivity
-    return Math.min(100, rms * 300); // Amplify for visibility
+    // Convert to 0-100 scale with much better sensitivity
+    // Use logarithmic scale for better representation
+    const db = 20 * Math.log10(rms + 0.0001);
+    const normalizedDb = Math.max(0, Math.min(100, (db + 60) * 1.67)); // -60dB to 0dB -> 0 to 100
+    return normalizedDb;
 };
 
 export function useWebRTC(
@@ -80,7 +83,8 @@ export function useWebRTC(
       vadGracePeriod: 300,       // 300ms grace period
       highPassFilter: true,      // Fan/AC gürültüsü filtrele
       highPassCutoff: 80         // 80Hz altını kes
-  }
+  },
+  selectedDeviceId?: string // Optional microphone device ID
 ) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
@@ -88,6 +92,7 @@ export function useWebRTC(
   const [speakingPeers, setSpeakingPeers] = useState<Set<string>>(new Set());
   const [voiceLevel, setVoiceLevel] = useState<number>(0);
   const [isSelfMonitoring, setIsSelfMonitoring] = useState(false);
+  const [currentDeviceId, setCurrentDeviceId] = useState<string | undefined>(selectedDeviceId);
   
   const peerConnections = useRef<{ [key: string]: RTCPeerConnection }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -182,10 +187,16 @@ export function useWebRTC(
   }, [audioOptions]);
 
   // Initialize Media Stream
-  const initLocalStream = useCallback(async () => {
+  const initLocalStream = useCallback(async (deviceId?: string) => {
     try {
       log("Initializing local stream...");
-      const constraints = getAudioConstraints(currentAudioOptionsRef.current);
+      const baseConstraints = getAudioConstraints(currentAudioOptionsRef.current);
+      
+      // Add device selection if specified
+      const constraints = deviceId 
+        ? { ...baseConstraints, deviceId: { exact: deviceId } }
+        : baseConstraints;
+      
       log(`Requesting microphone with constraints: ${JSON.stringify(constraints)}`);
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: constraints,
@@ -197,7 +208,7 @@ export function useWebRTC(
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         const settings = audioTrack.getSettings();
-        log(`Audio track settings: EC=${settings.echoCancellation}, NS=${settings.noiseSuppression}, AGC=${settings.autoGainControl}, SR=${settings.sampleRate}`);
+        log(`Audio track settings: EC=${settings.echoCancellation}, NS=${settings.noiseSuppression}, AGC=${settings.autoGainControl}, SR=${settings.sampleRate}, DeviceId=${settings.deviceId}`);
       }
       
       localStreamRef.current = stream;
@@ -894,6 +905,49 @@ export function useWebRTC(
     }
   };
 
+  // Change input device (microphone)
+  const changeInputDevice = useCallback(async (deviceId: string) => {
+    log(`Changing input device to: ${deviceId}`);
+    setCurrentDeviceId(deviceId);
+    
+    // Stop current stream
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    // Reinitialize with new device
+    const newStream = await initLocalStream(deviceId || undefined);
+    
+    if (newStream) {
+      // Update all peer connections with new track
+      const newTrack = newStream.getAudioTracks()[0];
+      if (newTrack) {
+        Object.values(peerConnections.current).forEach(pc => {
+          const senders = pc.getSenders();
+          const audioSender = senders.find(s => s.track?.kind === 'audio');
+          if (audioSender) {
+            audioSender.replaceTrack(newTrack);
+            log('Replaced audio track in peer connection');
+          }
+        });
+      }
+    }
+  }, [initLocalStream]);
+
+  // Change output device (speaker/headphones)
+  const changeOutputDevice = useCallback(async (deviceId: string) => {
+    log(`Changing output device to: ${deviceId}`);
+    
+    // Update all audio elements
+    audioElementsRef.current.forEach((audioElement, peerId) => {
+      if (typeof audioElement.setSinkId === 'function') {
+        audioElement.setSinkId(deviceId)
+          .then(() => log(`Set output device for peer ${peerId}`))
+          .catch(err => log(`Failed to set output device: ${err}`));
+      }
+    });
+  }, []);
+
   return {
     participants,
     isMuted,
@@ -904,5 +958,7 @@ export function useWebRTC(
     isSelfMonitoring,
     toggleSelfMonitor,
     peerConnections: peerConnections.current, // Expose peer connections for monitoring
+    changeInputDevice,
+    changeOutputDevice,
   };
 }

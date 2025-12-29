@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useWebRTC } from "../hooks/useWebRTC";
@@ -40,6 +40,10 @@ export function Room() {
       useLimiter: false,
       outputGain: 1.0
   });
+  
+  // Device selection state
+  const [selectedMicId, setSelectedMicId] = useState<string>('');
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>('');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -52,11 +56,23 @@ export function Room() {
     return user && userDisplayName ? { uid: user.uid, displayName: userDisplayName } : null;
   }, [user, userDisplayName]);
 
-  const { participants, isMuted, toggleMute, speakingPeers, voiceLevel, isSelfMonitoring, toggleSelfMonitor, peerConnections } = useWebRTC(
+  const { participants, isMuted, toggleMute, speakingPeers, voiceLevel, isSelfMonitoring, toggleSelfMonitor, peerConnections, changeInputDevice, changeOutputDevice } = useWebRTC(
     roomId || null,
     webRTCUser,
-    audioOptions
+    audioOptions,
+    selectedMicId
   );
+
+  // Handle device changes
+  const handleMicChange = useCallback((deviceId: string) => {
+    setSelectedMicId(deviceId);
+    changeInputDevice?.(deviceId);
+  }, [changeInputDevice]);
+
+  const handleSpeakerChange = useCallback((deviceId: string) => {
+    setSelectedSpeakerId(deviceId);
+    changeOutputDevice?.(deviceId);
+  }, [changeOutputDevice]);
 
   // Get first peer connection for monitoring (typically the most active)
   const activePeerConnection = useMemo(() => {
@@ -199,6 +215,10 @@ export function Room() {
         onToggleSelfMonitor={toggleSelfMonitor}
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        selectedMicId={selectedMicId}
+        selectedSpeakerId={selectedSpeakerId}
+        onMicChange={handleMicChange}
+        onSpeakerChange={handleSpeakerChange}
       />
     </div>
   );

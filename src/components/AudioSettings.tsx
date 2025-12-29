@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AudioProcessingOptions, getAudioQualityPreset } from '../utils/audioProcessor';
 import { 
   X, 
@@ -12,8 +12,16 @@ import {
   Settings2,
   Sparkles,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Speaker,
+  RefreshCw
 } from 'lucide-react';
+
+interface AudioDevice {
+  deviceId: string;
+  label: string;
+  kind: 'audioinput' | 'audiooutput';
+}
 
 interface AudioSettingsProps {
   options: AudioProcessingOptions;
@@ -23,6 +31,10 @@ interface AudioSettingsProps {
   onToggleSelfMonitor?: () => void;
   isOpen: boolean;
   onClose: () => void;
+  selectedMicId?: string;
+  selectedSpeakerId?: string;
+  onMicChange?: (deviceId: string) => void;
+  onSpeakerChange?: (deviceId: string) => void;
 }
 
 // Toggle Switch Component
@@ -114,9 +126,55 @@ export const AudioSettings: React.FC<AudioSettingsProps> = ({
   onToggleSelfMonitor,
   isOpen,
   onClose,
+  selectedMicId,
+  selectedSpeakerId,
+  onMicChange,
+  onSpeakerChange,
 }) => {
   const [localOptions, setLocalOptions] = useState(options);
-  const [activeTab, setActiveTab] = useState<'presets' | 'advanced'>('presets');
+  const [activeTab, setActiveTab] = useState<'devices' | 'presets' | 'advanced'>('devices');
+  const [microphones, setMicrophones] = useState<AudioDevice[]>([]);
+  const [speakers, setSpeakers] = useState<AudioDevice[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  // Load audio devices
+  const loadDevices = useCallback(async () => {
+    setIsLoadingDevices(true);
+    try {
+      // Request permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      
+      const mics = devices
+        .filter(d => d.kind === 'audioinput')
+        .map(d => ({
+          deviceId: d.deviceId,
+          label: d.label || `Microphone ${d.deviceId.slice(0, 5)}`,
+          kind: 'audioinput' as const
+        }));
+      
+      const spkrs = devices
+        .filter(d => d.kind === 'audiooutput')
+        .map(d => ({
+          deviceId: d.deviceId,
+          label: d.label || `Speaker ${d.deviceId.slice(0, 5)}`,
+          kind: 'audiooutput' as const
+        }));
+      
+      setMicrophones(mics);
+      setSpeakers(spkrs);
+    } catch (err) {
+      console.error('Failed to load audio devices:', err);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadDevices();
+    }
+  }, [isOpen, loadDevices]);
 
   useEffect(() => {
     setLocalOptions(options);
@@ -191,31 +249,141 @@ export const AudioSettings: React.FC<AudioSettingsProps> = ({
         {/* Tab Buttons */}
         <div className="flex gap-2 mb-4">
           <button
+            onClick={() => setActiveTab('devices')}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeTab === 'devices' 
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg' 
+                : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Headphones className="h-4 w-4 inline-block mr-1" />
+            Devices
+          </button>
+          <button
             onClick={() => setActiveTab('presets')}
-            className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 ${
               activeTab === 'presets' 
                 ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg' 
                 : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Sparkles className="h-4 w-4 inline-block mr-2" />
+            <Sparkles className="h-4 w-4 inline-block mr-1" />
             Presets
           </button>
           <button
             onClick={() => setActiveTab('advanced')}
-            className={`flex-1 py-2 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 ${
               activeTab === 'advanced' 
                 ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg' 
                 : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Settings2 className="h-4 w-4 inline-block mr-2" />
+            <Settings2 className="h-4 w-4 inline-block mr-1" />
             Advanced
           </button>
         </div>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+          {/* Devices Tab */}
+          {activeTab === 'devices' && (
+            <>
+              {/* Refresh Button */}
+              <div className="flex justify-end">
+                <button
+                  onClick={loadDevices}
+                  disabled={isLoadingDevices}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isLoadingDevices ? 'animate-spin' : ''}`} />
+                  Refresh Devices
+                </button>
+              </div>
+
+              {/* Microphone Selection */}
+              <div className="p-4 rounded-xl bg-secondary/30 border border-border/30 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600">
+                    <Mic className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Microphone</h3>
+                    <p className="text-xs text-muted-foreground">Select input device</p>
+                  </div>
+                </div>
+                <select
+                  value={selectedMicId || ''}
+                  onChange={(e) => onMicChange?.(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all cursor-pointer"
+                >
+                  <option value="">Default Microphone</option>
+                  {microphones.map((mic) => (
+                    <option key={mic.deviceId} value={mic.deviceId}>
+                      {mic.label}
+                    </option>
+                  ))}
+                </select>
+                {microphones.length === 0 && !isLoadingDevices && (
+                  <p className="text-xs text-yellow-400">No microphones found. Check permissions.</p>
+                )}
+              </div>
+
+              {/* Speaker Selection */}
+              <div className="p-4 rounded-xl bg-secondary/30 border border-border/30 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600">
+                    <Speaker className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Speaker / Headphones</h3>
+                    <p className="text-xs text-muted-foreground">Select output device</p>
+                  </div>
+                </div>
+                <select
+                  value={selectedSpeakerId || ''}
+                  onChange={(e) => onSpeakerChange?.(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-secondary/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all cursor-pointer"
+                >
+                  <option value="">Default Speaker</option>
+                  {speakers.map((spk) => (
+                    <option key={spk.deviceId} value={spk.deviceId}>
+                      {spk.label}
+                    </option>
+                  ))}
+                </select>
+                {speakers.length === 0 && !isLoadingDevices && (
+                  <p className="text-xs text-muted-foreground">Speaker selection not supported in this browser.</p>
+                )}
+              </div>
+
+              {/* Self Monitor */}
+              <SettingItem
+                icon={<Headphones className="h-4 w-4" />}
+                title="Self Monitor"
+                description="Hear your own voice (for testing)"
+              >
+                <Toggle 
+                  enabled={isSelfMonitoring} 
+                  onChange={onToggleSelfMonitor || (() => {})} 
+                  color="green"
+                />
+              </SettingItem>
+
+              {isSelfMonitoring && (
+                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs text-yellow-200">
+                  <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <span>Use headphones to avoid feedback. Turn off after testing.</span>
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-xs text-blue-200">
+                <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>Changing devices will reconnect your audio. Speaker selection requires Chrome/Edge.</span>
+              </div>
+            </>
+          )}
+
           {activeTab === 'presets' && (
             <>
               {/* Quality Presets Grid */}
@@ -253,26 +421,6 @@ export const AudioSettings: React.FC<AudioSettingsProps> = ({
                   gradient="from-pink-500 to-rose-600"
                 />
               </div>
-
-              {/* Self Monitor */}
-              <SettingItem
-                icon={<Headphones className="h-4 w-4" />}
-                title="Self Monitor"
-                description="Hear your own voice (for testing)"
-              >
-                <Toggle 
-                  enabled={isSelfMonitoring} 
-                  onChange={onToggleSelfMonitor || (() => {})} 
-                  color="green"
-                />
-              </SettingItem>
-
-              {isSelfMonitoring && (
-                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs text-yellow-200">
-                  <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>Use headphones to avoid feedback. Turn off after testing.</span>
-                </div>
-              )}
 
               {/* Info Box */}
               <div className="flex items-start gap-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl text-xs text-purple-200">
