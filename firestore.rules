@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function validateParticipant() {
+      return request.resource.data.keys().hasAll(['displayName', 'isMuted', 'joinedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 50
+        && request.resource.data.isMuted is bool;
+    }
+    
+    function validateMessage() {
+      return request.resource.data.keys().hasAll(['senderId', 'senderName', 'content', 'timestamp'])
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 1000
+        && request.resource.data.senderId == request.auth.uid;
+    }
+    
+    // Participant data
+    match /rooms/{roomId}/participants/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && validateParticipant();
+      allow update: if isOwner(userId) && validateParticipant();
+      allow delete: if isOwner(userId);
+      
+      // Signaling subcollections - users can read their own mailbox, others can write to it
+      match /incoming_offers/{offerId} {
+        allow read: if isOwner(userId);
+        allow create: if isAuthenticated() && request.resource.data.from == request.auth.uid;
+        allow delete: if isOwner(userId);
+      }
+      
+      match /incoming_answers/{answerId} {
+        allow read: if isOwner(userId);
+        allow create: if isAuthenticated() && request.resource.data.from == request.auth.uid;
+        allow delete: if isOwner(userId);
+      }
+      
+      match /incoming_ice/{iceId} {
+        allow read: if isOwner(userId);
+        allow create: if isAuthenticated() && request.resource.data.from == request.auth.uid;
+        allow delete: if isOwner(userId);
+      }
+    }
+    
+    // Chat messages - read by all, create with validation
+    match /rooms/{roomId}/messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && validateMessage();
+    }
+    
+    // Typing indicators - short-lived status
+    match /rooms/{roomId}/typing/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) 
+        && request.resource.data.displayName is string
+        && request.resource.data.timestamp != null;
+    }
+  }
+}
+
