@@ -56,7 +56,7 @@ export function Room() {
     return user && userDisplayName ? { uid: user.uid, displayName: userDisplayName } : null;
   }, [user, userDisplayName]);
 
-  const { participants, isMuted, toggleMute, speakingPeers, voiceLevel, isSelfMonitoring, toggleSelfMonitor, peerConnections, changeInputDevice, changeOutputDevice } = useWebRTC(
+  const { participants, isMuted, toggleMute, speakingPeers, voiceLevel, isSelfMonitoring, toggleSelfMonitor, peerConnections, connectionState, changeInputDevice, changeOutputDevice } = useWebRTC(
     roomId || null,
     webRTCUser,
     audioOptions,
@@ -74,22 +74,18 @@ export function Room() {
     changeOutputDevice?.(deviceId);
   }, [changeOutputDevice]);
 
-  // Get first peer connection for monitoring (typically the most active)
+  // Get first peer connection for monitoring
   const activePeerConnection = useMemo(() => {
     const connections = Object.values(peerConnections);
-    // Find a connected peer (not just any peer)
+    // Find a connected peer first
     const connectedPeer = connections.find(pc => 
       pc.connectionState === 'connected' || pc.iceConnectionState === 'connected'
     );
     return connectedPeer || (connections.length > 0 ? connections[0] : null);
   }, [peerConnections]);
 
-  // Check if we have any active peer connections
-  const hasActiveConnection = useMemo(() => {
-    return activePeerConnection !== null && 
-           (activePeerConnection.connectionState === 'connected' || 
-            activePeerConnection.iceConnectionState === 'connected');
-  }, [activePeerConnection]);
+  // Use connectionState from hook - it properly tracks state changes
+  const hasActiveConnection = connectionState === 'connected';
 
   const copyRoomId = () => {
     if (roomId) {
@@ -134,6 +130,8 @@ export function Room() {
             <ConnectionMonitor 
               peerConnection={activePeerConnection}
               isConnected={hasActiveConnection}
+              connectionState={connectionState}
+              participantCount={participants.length}
             />
             <div className="text-sm text-muted-foreground">
               {participants.length} Participant{participants.length !== 1 && "s"}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Wifi, WifiOff, Users, Loader2 } from 'lucide-react';
 
 interface ConnectionStats {
   latency: number;        // RTT in ms
@@ -8,12 +8,21 @@ interface ConnectionStats {
   bitrate: number;        // Audio bitrate in kbps
 }
 
+type ConnectionState = 'disconnected' | 'connecting' | 'connected';
+
 interface ConnectionMonitorProps {
   peerConnection: RTCPeerConnection | null;
   isConnected: boolean;
+  connectionState?: ConnectionState;
+  participantCount?: number;
 }
 
-export const ConnectionMonitor = ({ peerConnection, isConnected }: ConnectionMonitorProps) => {
+export const ConnectionMonitor = ({ 
+  peerConnection, 
+  isConnected, 
+  connectionState = 'disconnected',
+  participantCount = 1 
+}: ConnectionMonitorProps) => {
   const [stats, setStats] = useState<ConnectionStats>({
     latency: 0,
     jitter: 0,
@@ -84,11 +93,32 @@ export const ConnectionMonitor = ({ peerConnection, isConnected }: ConnectionMon
     return 'Poor';
   };
 
+  // Alone in room - show waiting message
+  if (participantCount <= 1) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+        <Users className="w-4 h-4 text-blue-400" />
+        <span className="text-sm text-blue-400">Waiting for others...</span>
+      </div>
+    );
+  }
+
+  // Connecting state
+  if (connectionState === 'connecting') {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
+        <Loader2 className="w-4 h-4 text-yellow-400 animate-spin" />
+        <span className="text-sm text-yellow-400">Connecting...</span>
+      </div>
+    );
+  }
+
+  // Not connected
   if (!isConnected) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700">
-        <WifiOff className="w-4 h-4 text-gray-500" />
-        <span className="text-sm text-gray-400">No Connection</span>
+        <WifiOff className="w-4 h-4 text-red-400" />
+        <span className="text-sm text-red-400">Connection Lost</span>
       </div>
     );
   }

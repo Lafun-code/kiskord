@@ -139,6 +139,7 @@ export function useWebRTC(
   const [voiceLevel, setVoiceLevel] = useState<number>(0);
   const [isSelfMonitoring, setIsSelfMonitoring] = useState(false);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | undefined>(selectedDeviceId);
+  const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   
   const peerConnections = useRef<{ [key: string]: RTCPeerConnection }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -560,6 +561,40 @@ export function useWebRTC(
       };
   }, [localStream, detectSpeaking]);
 
+  // Helper to update overall connection state based on all peer connections
+  const updateConnectionState = useCallback(() => {
+    const connections = Object.values(peerConnections.current);
+    
+    if (connections.length === 0) {
+      setConnectionState('disconnected');
+      return;
+    }
+    
+    // Check if any connection is connected
+    const hasConnected = connections.some(pc => 
+      pc.connectionState === 'connected' || pc.iceConnectionState === 'connected'
+    );
+    
+    if (hasConnected) {
+      setConnectionState('connected');
+      return;
+    }
+    
+    // Check if any connection is connecting
+    const hasConnecting = connections.some(pc => 
+      pc.connectionState === 'connecting' || 
+      pc.connectionState === 'new' || 
+      pc.iceConnectionState === 'checking'
+    );
+    
+    if (hasConnecting) {
+      setConnectionState('connecting');
+      return;
+    }
+    
+    setConnectionState('disconnected');
+  }, []);
+
 
   // Helper to create PeerConnection
   const createPeerConnection = useCallback((targetUserId: string, stream: MediaStream) => {
@@ -587,6 +622,9 @@ export function useWebRTC(
     // Handle connection state changes
     pc.onconnectionstatechange = () => {
       log(`Connection state with ${targetUserId}: ${pc.connectionState}`);
+      
+      // Update overall connection state
+      updateConnectionState();
       
       if (pc.connectionState === 'connected') {
         log(`Successfully connected to ${targetUserId}`);
@@ -1025,6 +1063,7 @@ export function useWebRTC(
     isSelfMonitoring,
     toggleSelfMonitor,
     peerConnections: peerConnections.current, // Expose peer connections for monitoring
+    connectionState, // Overall connection state: 'disconnected' | 'connecting' | 'connected'
     changeInputDevice,
     changeOutputDevice,
   };
